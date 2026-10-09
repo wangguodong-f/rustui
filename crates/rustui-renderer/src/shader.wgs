@@ -1,0 +1,179 @@
+// RustUI render pipeline.
+//
+// Everything is instanced: one instance is one quad (four corners in physical pixels), which lets
+// the vertex shader skip uniforms entirely besides the viewport size. Colors are per corner so a
+// linear gradient is exact, blending is premultiplied alpha and the fragment shader rounds corners
+// with a signed distance field (plus an optional inset that turns the quad into a border ring).
+// Rounded clips are cut with the same SDF (T-5 / C-051); corner radii may differ per corner
+// (T-6 / C-052).
+
+struct Globals {
+    // Drawable size in physical pixels.
+    viewport: vec2<f32>,
+    // Padding to the 16 byte uniform alignment.
+    _pad: vec2<f32>,
+};
+
+@group(0) @binding(0) var<uniform> globals: Globals;
+@group(1) @binding(0) var t_texture: texture_2d<f32>;
+@group(1) @binding(1) var s_sampler: sampler;
+
+struct VsIn {
+    // Quad corners: top-left, top-right, bottom-left, bottom-right.
+    @location(0) c0: vec2<f32>,
+    @location(1) c1: vec2<f32>,
+    @location(2) c2: vec2<f32>,
+    @location(3) c3: vec2<f32>,
+    @location(4) uv: vec4<f32>,
+    @location(5) color0: vec4<f32>,
+    @location(6) color1: vec4<f32>,
+    @location(7) color2: vec4<f32>,
+    @location(8) color3: vec4<f32>,
+    // Border inset (left, top, right, bottom) in physical pixels.
+    @location(9) inset: vec4<f32>,
+    // mode (1 = coverage mask), rounded clip radius, reserved, reserved.
+    @location(10) params: vec4<f32>,
+    // Corner radii in physical pixels: top-left, top-right, bottom-left, bottom-right.
+    @location(11) radii: vec4<f32>,
+    // Active rounded clip rectangle (x, y, w, h) in physical pixels; its radius is params.y.
+    @location(12) clip: vec4<f32>,
+};
+
+struct VsOut {
+    @builtin(position) position: vec4<f32>,
+    @location(0) color: vec4<f32>,
+    @location(1) uv: vec2<f32>,
+    @location(2) local: vec2<f32>,
+    @location(3) size: vec2<f32>,
+    @location(4) inset: vec4<f32>,
+    // mode (1 = coverage mask).
+    @location(5) mode: f32,
+    // Corner radii, same order as VsIn.radii. Constant across the quad's four vertices, so the
+    // default interpolation leaves them untouched.
+    @location(6) radii: vec4<f32>,
+    // Rounded clip rectangle and its radius.
+    @location(7) clip: vec4<f32>,
+    @location(8) clip_radius: f32,
+};
+
+@vertex
+fn vs(input: VsIn, @builtin(vertex_index) vertex_index: u32) -> VsOut {
+    var corners = array<vec2<f32>, 4>(input.c0, input.c1, input.c2, input.c3);
+    var colors = array<vec4<f32>, 4>(input.color0, input.color1, input.color2, input.color3);
+    var units = array<vec2<f32>, 4>(
+        vec2<f32>(0.0, 0.0),
+        vec2<f32>(1.0, 0.0),
+        vec2<f32>(0.0, 1.0),
+        vec2<f32>(1.0, 1.0),
+    );
+    var indices = array<u32, 6>(0u, 1u, 2u, 1u, 3u, 2u);
+
+    let index = indices[vertex_index];
+    let unit = units[index];
+    let uv = vec2<f32>(
+        select(input.uv.x, input.uv.z, unit.x > 0.5),
+        select(input.uv.y, input.uv.w, unit.y > 0.5),
+    );
+
+    var out: VsOut;
+    out.position = vec4<f32>(
+        corners[index].x / globals.viewport.x * 2.0 - 1.0,
+        1.0 - corners[index].y / globals.viewport.y * 2.0,
+        0.0,
+        1.0,
+    );
+    out.color = colors[index];
+    out.uv = uv;
+    out.local = unit;
+    out.size = vec2<f32>(length(input.c1 - input.c0), length(input.c2 - input.c0));
+    out.inset = input.inset;
+    out.mode = input.params.x;
+    out.radii = input.radii;
+    out.clip = input.clip;
+    out.clip_radius = input.params.y;
+    return out;
+}
+
+// Signed distance to a rectangle with up to four different corner radii
+// (`top_left, top_right, bottom_left, bottom_right`), antialiased with screen space derivatives
+// so the edge stays crisp at any scale factor. Each fragment uses the radius of its own quadrant:
+// inside the rectangle the distance is independent of the radius, so the four patches meet
+// seamlessly (T-6 / C-052).
+fn rounded_coverage(point: vec2<f32>, size: vec2<f32>, radii: vec4<f32>) -> f32 {
+    if (size.x <= 0.0 || size.y <= 0.0) {
+        return 0.0;
+    }
+    let half = size * 0.5;
+    var radius = radii.x;
+    if (point.x > half.x) {
+        if (point.y > half.y) {
+            radius = radii.w;
+        } else {
+            radius = radii.y;
+        }
+    } else if (point.y > half.y) {
+        radius = radii.z;
+    }
+    let r = clamp(radius, 0.0, min(half.x, half.y));
+    let q = abs(point - half) - (half - vec2<f32>(r));
+    let distance = length(max(q, vec2<f32>(0.0))) + min(max(q.x, q.y), 0.0) - r;
+    let aa = max(fwidth(distance), 0.5);
+    return clamp(0.5 - distance / aa, 0.0, 1.0);
+}
+
+@fragment
+fn fs(input: VsOut) -> @location(0) vec4<f32> {
+    var shape = 1.0;
+    let inset = input.inset;
+    if (any(input.radii > vec4<f32>(0.0)) || any(inset > vec4<f32>(0.0))) {
+        let point = input.local * input.size;
+        var coverage = rounded_coverage(point, input.size, input.radii);
+        if (any(inset > vec4<f32>(0.0))) {
+            // Border ring: the inner rectangle is subtracted from the outer one. Every corner
+            // keeps its own radius, trimmed by the two sides that meet there.
+            let inner_size = vec2<f32>(
+                max(input.size.x - inset.x - inset.z, 0.0),
+                max(input.size.y - inset.y - inset.w, 0.0),
+            );
+            let inner_radii = vec4<f32>(
+                max(input.radii.x - max(inset.x, inset.y), 0.0),
+                max(input.radii.y - max(inset.y, inset.z), 0.0),
+                max(input.radii.z - max(inset.w, inset.x), 0.0),
+                max(input.radii.w - max(inset.z, inset.w), 0.0),
+            );
+            let inner = rounded_coverage(
+                point - vec2<f32>(inset.x, inset.y),
+                inner_size,
+                inner_radii,
+            );
+            coverage = coverage * (1.0 - inner);
+        }
+        shape = coverage;
+    }
+
+    // Rounded clip (T-5 / C-051): the scissor already enforces every clip rectangle, this carves
+    // the arcs of the innermost rounded clip. Radius 0 keeps the path identical to plain scissor
+    // clipping, so unclipped drawing is bit for bit what it always was.
+    if (input.clip_radius > 0.0) {
+        let clip_point = input.position.xy - input.clip.xy;
+        shape *= rounded_coverage(
+            clip_point,
+            input.clip.zw,
+            vec4<f32>(input.clip_radius),
+        );
+    }
+
+    let tex = textureSample(t_texture, s_sampler, input.uv);
+    var alpha = 0.0;
+    var rgb = vec3<f32>(0.0);
+    if (input.mode > 0.5) {
+        // Coverage mask (white texture or glyph atlas).
+        alpha = input.color.a * tex.r;
+        rgb = input.color.rgb * alpha;
+    } else {
+        // RGBA image tinted by the instance color.
+        alpha = input.color.a * tex.a;
+        rgb = input.color.rgb * tex.rgb * alpha;
+    }
+    return vec4<f32>(rgb * shape, alpha * shape);
+}

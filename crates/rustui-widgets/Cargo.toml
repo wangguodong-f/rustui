@@ -1,0 +1,15 @@
+[package]
+name = "rustui-widgets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Widget library of RustUI: buttons, labels, text input, scroll view, list, table, tree, menus and dialogs"
+
+[dependencies]
+rustui-core.workspace = true
+rustui-layout.workspace = true
+rustui-text.workspace = true
+rustui-model.workspace = true
+rustui-animation.workspace = true

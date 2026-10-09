@@ -1,0 +1,55 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rustui-core",
+    "crates/rustui-platform",
+    "crates/rustui-text",
+    "crates/rustui-renderer",
+    "crates/rustui-layout",
+    "crates/rustui-model",
+    "crates/rustui-animation",
+    "crates/rustui-widgets",
+    "crates/rustui-window",
+    "crates/rustui",
+    "examples/hello",
+    "examples/calculator",
+    "examples/table_view",
+    "examples/widget_gallery",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT OR Apache-2.0"
+authors = ["RustUI Contributors"]
+description = "A native, cross-platform, GPU accelerated retained-mode GUI framework for Rust"
+
+[workspace.dependencies]
+rustui-core = { path = "crates/rustui-core", version = "0.1.0" }
+rustui-platform = { path = "crates/rustui-platform", version = "0.1.0" }
+rustui-text = { path = "crates/rustui-text", version = "0.1.0" }
+rustui-renderer = { path = "crates/rustui-renderer", version = "0.1.0" }
+rustui-layout = { path = "crates/rustui-layout", version = "0.1.0" }
+rustui-model = { path = "crates/rustui-model", version = "0.1.0" }
+rustui-animation = { path = "crates/rustui-animation", version = "0.1.0" }
+rustui-widgets = { path = "crates/rustui-widgets", version = "0.1.0" }
+rustui-window = { path = "crates/rustui-window", version = "0.1.0" }
+rustui = { path = "crates/rustui", version = "0.1.0" }
+
+bytemuck = { version = "1.23", features = ["derive"] }
+log = "0.4"
+wgpu = "30.0"
+winit = "0.30"
+pollster = "1.0"
+ab_glyph = "0.2"
+fontdb = "0.24"
+rustybuzz = { version = "0.20", default-features = false }
+unicode-bidi = "0.3"
+arboard = { version = "3", default-features = false }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2

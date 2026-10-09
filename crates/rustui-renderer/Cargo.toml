@@ -1,0 +1,15 @@
+[package]
+name = "rustui-renderer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "GPU renderer of RustUI: wgpu pipeline, instanced batching and the glyph atlas upload"
+
+[dependencies]
+rustui-core.workspace = true
+wgpu.workspace = true
+bytemuck.workspace = true
+log.workspace = true
+pollster.workspace = true

@@ -1,0 +1,58 @@
+[package]
+name = "widget-gallery"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+rustui.workspace = true
+
+[[bin]]
+name = "label"
+path = "src/bin/label.rs"
+
+[[bin]]
+name = "button"
+path = "src/bin/button.rs"
+
+[[bin]]
+name = "checkbox"
+path = "src/bin/checkbox.rs"
+
+[[bin]]
+name = "text_input"
+path = "src/bin/text_input.rs"
+
+[[bin]]
+name = "progress_bar"
+path = "src/bin/progress_bar.rs"
+
+[[bin]]
+name = "combo_box"
+path = "src/bin/combo_box.rs"
+
+[[bin]]
+name = "list_view"
+path = "src/bin/list_view.rs"
+
+[[bin]]
+name = "tree_view"
+path = "src/bin/tree_view.rs"
+
+[[bin]]
+name = "table_view"
+path = "src/bin/table_view.rs"
+
+[[bin]]
+name = "scroll_view"
+path = "src/bin/scroll_view.rs"
+
+[[bin]]
+name = "dialog"
+path = "src/bin/dialog.rs"
+
+[[bin]]
+name = "menu"
+path = "src/bin/menu.rs"

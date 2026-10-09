@@ -1,0 +1,11 @@
+[package]
+name = "rustui-animation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Animation system of RustUI: easings, animations, transitions and the animation driver"
+
+[dependencies]
+rustui-core.workspace = true

@@ -1,0 +1,13 @@
+[package]
+name = "rustui-window"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Window and frame pipeline of RustUI: composite layout, hit testing, focus, event dispatch and overlays"
+
+[dependencies]
+rustui-core.workspace = true
+rustui-renderer.workspace = true
+log.workspace = true

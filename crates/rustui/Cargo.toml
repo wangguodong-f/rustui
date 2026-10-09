@@ -1,0 +1,30 @@
+[package]
+name = "rustui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "RustUI: a native, cross-platform, GPU accelerated retained-mode GUI framework for Rust"
+
+[dependencies]
+rustui-core.workspace = true
+rustui-platform.workspace = true
+rustui-text.workspace = true
+rustui-renderer.workspace = true
+rustui-layout.workspace = true
+rustui-model.workspace = true
+rustui-animation.workspace = true
+rustui-widgets.workspace = true
+rustui-window.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+raw-window-handle = "0.6"
+log.workspace = true
+
+[dev-dependencies]
+criterion = "0.8"
+
+[[bench]]
+name = "pipeline"
+harness = false
